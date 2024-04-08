@@ -12,6 +12,8 @@
  *******************************************************************************/
 package org.eclipse.gef.editpolicies;
 
+import java.lang.ref.WeakReference;
+
 import org.eclipse.gef.EditPart;
 import org.eclipse.gef.EditPolicy;
 import org.eclipse.gef.Request;
@@ -28,7 +30,7 @@ import org.eclipse.gef.commands.Command;
  */
 public abstract class AbstractEditPolicy implements EditPolicy, RequestConstants {
 
-	private EditPart host;
+	private WeakReference<EditPart> host;
 
 	/**
 	 * Does nothing by default.
@@ -55,6 +57,7 @@ public abstract class AbstractEditPolicy implements EditPolicy, RequestConstants
 	 * @param message the String to log
 	 * @deprecated in 3.1 This method will be removed in future releases.
 	 */
+	@Deprecated
 	protected final void debugFeedback(String message) {
 	}
 
@@ -93,7 +96,7 @@ public abstract class AbstractEditPolicy implements EditPolicy, RequestConstants
 	 */
 	@Override
 	public EditPart getHost() {
-		return host;
+		return host.get();
 	}
 
 	/**
@@ -113,7 +116,7 @@ public abstract class AbstractEditPolicy implements EditPolicy, RequestConstants
 	 */
 	@Override
 	public void setHost(EditPart host) {
-		this.host = host;
+		this.host = new WeakReference<>(host);
 	}
 
 	/**
@@ -143,9 +146,8 @@ public abstract class AbstractEditPolicy implements EditPolicy, RequestConstants
 		c = c.substring(c.lastIndexOf('.') + 1);
 		if (getHost() != null) {
 			return getHost().toString() + "." + c; //$NON-NLS-1$
-		} else {
-			return c + " (no host for EditPolicy set yet)"; //$NON-NLS-1$
 		}
+		return c + " (no host for EditPolicy set yet)"; //$NON-NLS-1$
 	}
 
 	/**

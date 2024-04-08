@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2000, 2023 IBM Corporation and others.
+ * Copyright (c) 2000, 2023, 2024 IBM Corporation and others.
  *
  * This program and the accompanying materials are made available under the
  * terms of the Eclipse Public License 2.0 which is available at
@@ -12,6 +12,7 @@
  *******************************************************************************/
 package org.eclipse.gef.editparts;
 
+import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -74,7 +75,7 @@ public abstract class AbstractEditPart implements EditPart, RequestConstants, IA
 
 	private Object model;
 	private int flags;
-	private EditPart parent;
+	private WeakReference<EditPart> parent;
 	private int selected;
 
 	private Object[] policies;
@@ -94,7 +95,7 @@ public abstract class AbstractEditPart implements EditPart, RequestConstants, IA
 	 * <code>null</code> values encountered.
 	 */
 	protected static class EditPolicyIterator {
-		private Object[] list;
+		private final Object[] list;
 		private int offset = 0;
 		private final int length;
 
@@ -109,6 +110,7 @@ public abstract class AbstractEditPart implements EditPart, RequestConstants, IA
 		 * @deprecated this constructor should not be used
 		 * @param list the list of policies.
 		 */
+		@Deprecated
 		public EditPolicyIterator(List list) {
 			this(list.toArray());
 		}
@@ -166,7 +168,7 @@ public abstract class AbstractEditPart implements EditPart, RequestConstants, IA
 
 		activateEditPolicies();
 
-		getChildren().forEach(c -> c.activate());
+		getChildren().forEach(EditPart::activate);
 
 		fireActivated();
 	}
@@ -254,7 +256,7 @@ public abstract class AbstractEditPart implements EditPart, RequestConstants, IA
 	public void addNotify() {
 		register();
 		createEditPolicies();
-		getChildren().forEach(c -> c.addNotify());
+		getChildren().forEach(EditPart::addNotify);
 		refresh();
 	}
 
@@ -293,7 +295,7 @@ public abstract class AbstractEditPart implements EditPart, RequestConstants, IA
 	 */
 	@Override
 	public void deactivate() {
-		getChildren().forEach(c -> c.deactivate());
+		getChildren().forEach(EditPart::deactivate);
 		deactivateEditPolicies();
 		setFlag(FLAG_ACTIVE, false);
 		fireDeactivated();
@@ -313,17 +315,44 @@ public abstract class AbstractEditPart implements EditPart, RequestConstants, IA
 	 * @param message a debug message
 	 * @deprecated in 3.1
 	 */
+	@Deprecated
 	protected final void debug(String message) {
 	}
 
 	/**
 	 * This method will log the message to GEF's trace/debug system if the
-	 * corrseponding flag for FEEDBACK is set to true.
+	 * corresponding flag for FEEDBACK is set to true.
 	 *
 	 * @param message Message to be passed
 	 * @deprecated in 3.1
 	 */
+	@Deprecated
 	protected final void debugFeedback(String message) {
+	}
+
+	/**
+	 * Deactivate all edit policy and clear the list
+	 *
+	 * @param considerChildren determine edit policies will be removed from children
+	 *                         as well or not
+	 * @since 3.18
+	 */
+	public void clearPolicies(boolean considerChildren) {
+		if (considerChildren) {
+			for (EditPart c : getChildren()) {
+				if (c instanceof AbstractEditPart aep) {
+					aep.clearPolicies(considerChildren);
+				}
+			}
+		}
+		for (int i = 0; i < policies.length; i += 2) {
+			EditPolicy policy = (EditPolicy) policies[i + 1];
+			policies[i + 1] = null;
+			if (isActive() && policy != null) {
+				policy.deactivate();
+			}
+		}
+		policies = null;
 	}
 
 	/**
@@ -583,7 +612,10 @@ public abstract class AbstractEditPart implements EditPart, RequestConstants, IA
 	 */
 	@Override
 	public EditPart getParent() {
-		return parent;
+		if (parent != null) {
+			return parent.get();
+		}
+		return null;
 	}
 
 	/**
@@ -952,7 +984,7 @@ public abstract class AbstractEditPart implements EditPart, RequestConstants, IA
 			getViewer().setFocus(null);
 		}
 
-		getChildren().forEach(c -> c.removeNotify());
+		getChildren().forEach(EditPart::removeNotify);
 		unregister();
 	}
 
@@ -1034,7 +1066,7 @@ public abstract class AbstractEditPart implements EditPart, RequestConstants, IA
 	 */
 	@Override
 	public void setParent(EditPart parent) {
-		this.parent = parent;
+		this.parent = new WeakReference<>(parent);
 	}
 
 	/**
